@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cricket Score Tracker</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f3f3f3;
+    }
+
+    .container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    #total-score {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    #current-over {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    #runs-scored {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    #target-score,
+    #required-runs {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    #match-status {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 20px;
+        color: green;
+    }
+
+    .score-buttons {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .score-button {
+        width: 48%;
+        margin-bottom: 10px;
+        padding: 10px;
+        font-size: 16px;
+        text-align: center;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .score-button.wicket {
+        background-color: #f44336;
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .action-button {
+        width: 32%;
+        margin-bottom: 10px;
+        padding: 10px;
+        font-size: 16px;
+        text-align: center;
+        background-color: #008CBA;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .action-button.reset {
+        background-color: #f44336;
+    }
+
+    .target-input {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 10px;
+        font-size: 16px;
+        text-align: center;
+        background-color: #f3f3f3;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    .popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .popup-content {
+        background-color: white;
+        padding: 20px;
+        border-radius: 5px;
+        text-align: center;
+    }
+
+    .popup-button {
+        margin: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1 id="total-score">Total Score: 0</h1>
+    <h2 id="current-over">Over: 0.0</h2>
+    <div id="runs-scored"></div>
+    <div id="target-score" style="display: none;">Target: Not Set</div>
+    <div id="required-runs" style="display: none;">Required Runs: Not Set</div>
+    <div id="match-status"></div>
+    <div class="score-buttons">
+        <button class="score-button" onclick="updateScore(0);">0</button>
+        <button class="score-button" onclick="updateScore(1);">1</button>
+        <button class="score-button" onclick="updateScore(2);">2</button>
+        <button class="score-button" onclick="updateScore(3);">3</button>
+        <button class="score-button" onclick="updateScore(4);">4</button>
+        <button class="score-button" onclick="updateScore(5);">5</button>
+        <button class="score-button" onclick="updateScore(6);">6</button>
+        <button class="score-button wicket" onclick="updateScore('W');">Wicket</button>
+        <button class="score-button" onclick="updateScore('1WB');">Wide</button>
+        <button class="score-button" onclick="updateScore('0NB');">No Ball</button>
+    </div>
+    <div class="action-buttons">
+        <button class="action-button" onclick="undoLastScore();">Undo</button>
+        <button class="action-button reset" onclick="showInningsPopup();">New Match</button>
+    </div>
+</div>
+
+<div id="innings-popup" class="popup" style="display: none;">
+    <div class="popup-content">
+        <h2>Is this the first innings?</h2>
+        <button class="popup-button" onclick="startFirstInnings();">Yes</button>
+        <button class="popup-button" onclick="showTargetPopup();">No</button>
+    </div>
+</div>
+
+<div id="target-popup" class="popup" style="display: none;">
+    <div class="popup-content">
+        <h2>Set Target for Second Innings</h2>
+        <input type="number" id="target-input" class="target-input" placeholder="Set Target Score">
+        <button class="popup-button" onclick="setTargetAndStart();">Set Target</button>
+    </div>
+</div>
+
+<script>
+    var totalScore = 0;
+    var balls = 0;
+    var runsInOver = JSON.parse(localStorage.getItem("runsInOver")) || [];
+    var wideOrNoBall = false;
+    var targetScore = parseInt(localStorage.getItem("targetScore")) || null;
+    var innings = parseInt(localStorage.getItem("innings")) || 1;
+
+    // Restore total score
+    totalScore = parseInt(localStorage.getItem("totalScore")) || 0;
+    document.getElementById("total-score").innerHTML = "Total Score: " + totalScore;
+
+    // Restore ball count
+    balls = parseInt(localStorage.getItem("balls")) || 0;
+
+    // Restore target score
+    if (targetScore) {
+        document.getElementById("target-score").innerHTML = "Target: " + targetScore;
+        document.getElementById("required-runs").innerHTML = "Required Runs: " + (targetScore - totalScore);
+        document.getElementById("target-score").style.display = "block";
+        document.getElementById("required-runs").style.display = "block";
+    }
+
+    document.getElementById("runs-scored").innerHTML = runsInOver.join('');
+    document.getElementById("current-over").innerHTML = "Over: " + Math.floor(balls / 6) + "." + balls % 6;
+
+    function updateScore(score) {
+        if (score === 'W') {
+            runsInOver.push("W");
+            wideOrNoBall = false;
+        } else if (score === '1WB') {
+            totalScore += 1;
+            runsInOver.push("1(WB)");
+            wideOrNoBall = true;
+        } else if (score === '0NB') {
+            runsInOver.push("0(NB)");
+            wideOrNoBall = true;
+        } else {
+            totalScore += score;
+            runsInOver.push(score);
+            wideOrNoBall = false;
+        }
+
+        document.getElementById("total-score").innerHTML = "Total Score: " + totalScore;
+        var requiredRuns = targetScore - totalScore;
+        document.getElementById("required-runs").innerHTML = "Required Runs: " + requiredRuns;
+
+        if (requiredRuns <= 0) {
+            document.getElementById("match-status").innerHTML = "Match Won";
+        }
+
+        if (balls > 0 && (balls + 1) % 6 === 0 && score !== '0NB' && score !== '1WB') {
+            runsInOver.push(" - ");
+        } else {
+            runsInOver.push(" ");
+        }
+
+        if (score !== '0NB' && score !== '1WB') {
+            balls++;
+        }
+
+        localStorage.setItem("totalScore", totalScore);
+        localStorage.setItem("balls", balls);
+        localStorage.setItem("runsInOver", JSON.stringify(runsInOver));
+
+        document.getElementById("runs-scored").innerHTML = runsInOver.join('');
+        document.getElementById("current-over").innerHTML = "Over: " + Math.floor(balls / 6) + "." + balls % 6;
+    }
+
+    function undoLastScore() {
+        if (runsInOver.length > 0) {
+            var lastScore = runsInOver.pop();
+
+            if(lastScore === " ") {
+                lastScore = runsInOver.pop();
+            }
+
+            if(lastScore === " - ") {
+                lastScore = runsInOver.pop();
+                if(lastScore === " ") {
+                     lastScore = runsInOver.pop();
+                }
+            }
+
+            if (lastScore === "W") {
+                totalScore -= 0; // Since it's a wicket
+                balls--;
+            } else if (lastScore === "1(WB)") {
+                totalScore -= 1; // For wide or no ball
+            } else if (lastScore === "0(NB)") {
+                //No change in run for no ball
+            } else {
+                totalScore -= parseInt(lastScore, 10);
+                balls--;
+            }
+
+            document.getElementById("total-score").innerHTML = "Total Score: " + totalScore;
+            document.getElementById("required-runs").innerHTML = "Required Runs: " + (targetScore - totalScore);
+            document.getElementById("runs-scored").innerHTML = runsInOver.join('');
+            document.getElementById("current-over").innerHTML = "Over: " + Math.floor(balls / 6) + "." + balls % 6;
+            document.getElementById("match-status").innerHTML = ""; // Clear the match status if the score is undone
+        }
+    }
+
+    function showInningsPopup() {
+        document.getElementById("innings-popup").style.display = "flex";
+    }
+
+    function startFirstInnings() {
+        innings = 1;
+        localStorage.setItem("innings", innings);
+        document.getElementById("innings-popup").style.display = "none";
+        resetScore(true);
+    }
+
+    function showTargetPopup() {
+        document.getElementById("innings-popup").style.display = "none";
+        document.getElementById("target-popup").style.display = "flex";
+    }
+
+    function setTargetAndStart() {
+        var input = document.getElementById("target-input").value;
+        targetScore = parseInt(input);
+        document.getElementById("target-score").innerHTML = "Target: " + targetScore;
+        document.getElementById("required-runs").innerHTML = "Required Runs: " + (targetScore - totalScore);
+        localStorage.setItem("targetScore", targetScore);
+        document.getElementById("target-score").style.display = "block";
+        document.getElementById("required-runs").style.display = "block";
+        document.getElementById("target-popup").style.display = "none";
+        resetScore(false);
+    }
+
+    function resetScore(isFirstInnings) {
+        totalScore = 0;
+        balls = 0;
+        runsInOver = [];
+        document.getElementById("total-score").innerHTML = "Total Score: 0";
+        document.getElementById("runs-scored").innerHTML = "";
+        document.getElementById("current-over").innerHTML = "Over: 0.0";
+        document.getElementById("match-status").innerHTML = "";
+        localStorage.removeItem("totalScore");
+        localStorage.removeItem("balls");
+        localStorage.removeItem("runsInOver");
+
+        if (isFirstInnings) {
+            targetScore = null;
+            document.getElementById("target-score").style.display = "none";
+            document.getElementById("required-runs").style.display = "none";
+            document.getElementById("target-score").innerHTML = "Target: Not Set";
+            document.getElementById("required-runs").innerHTML = "Required Runs: Not Set";
+            localStorage.removeItem("targetScore");
+        } else {
+            document.getElementById("target-score").style.display = "block";
+            document.getElementById("required-runs").style.display = "block";
+        }
+    }
+</script>
+</body>
+</html>
+	
